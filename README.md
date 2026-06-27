@@ -43,6 +43,24 @@ mvn spring-boot:run
 僅允許來自 `http://localhost:3000` 的請求，需 `Content-Type` header。  
 正式環境請修改 `CorsConfig.java` 中的 `allowedOrigins`。
 
+## 專案結構
+
+```
+├── src/main/java/com/example/googlelogin/
+│   ├── config/CorsConfig.java
+│   ├── controller/AuthController.java
+│   ├── service/
+│   │   ├── AuthService.java      # SHA-256 密碼驗證
+│   │   └── SessionStore.java     # 記憶體 session 管理
+│   └── model/AuthRequest.java
+├── deploy/
+│   └── k8s/
+│       ├── deployment.yaml       # k8s Deployment（2 replicas、probe）
+│       └── service.yaml          # k8s ClusterIP Service
+├── .gitlab-ci.yml                # GitLab CI/CD Pipeline
+└── Dockerfile
+```
+
 ## Docker
 
 ```bash
@@ -84,6 +102,26 @@ spec:
     - port: 8080
       targetPort: 8080
 ```
+
+## GitLab CI/CD
+
+### Pipeline 流程
+```
+push to main
+    ↓
+[build] docker build → push to GitLab Registry
+    ↓
+[deploy] kubectl apply → kubectl set image → rollout status
+```
+
+### 需設定的 CI Variables
+
+| 變數 | 說明 |
+|---|---|
+| `KUBE_CONFIG` | base64 編碼的 kubeconfig |
+| `KUBE_NAMESPACE` | 部署的 k8s namespace |
+
+> 部署前請將 `deploy/k8s/deployment.yaml` 中的 `registry.gitlab.com/YOUR_GROUP/...` 換成實際路徑。
 
 ## 安全性說明
 
