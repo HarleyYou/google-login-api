@@ -71,7 +71,7 @@ public class AuthController {
                 .map(jakarta.servlet.http.Cookie::getValue)
                 .findFirst()
                 .orElse(null);
-        if (email == null || email.isBlank()) {
+        if (email == null || email.isBlank() || !authService.userExists(email)) {
             return ResponseEntity.status(401).body(Map.of("error", "未登入"));
         }
         return ResponseEntity.ok(Map.of("email", email));
