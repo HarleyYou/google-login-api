@@ -26,7 +26,7 @@ public class AuthController {
 
     @PostMapping("/check-email")
     public ResponseEntity<Map<String, Object>> checkEmail(@RequestBody AuthRequest req) {
-        if (req.email() == null || req.email().length() > 254 || !req.email().contains("@")) {
+        if (req.email() == null || req.email().length() > 254 || !req.email().matches("^[^@]+@[^@]+\\.[^@]+$")) {
             return ResponseEntity.badRequest().body(Map.of("error", "請輸入有效的電子郵件地址"));
         }
         if (!authService.userExists(req.email())) {
