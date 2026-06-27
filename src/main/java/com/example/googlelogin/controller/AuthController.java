@@ -2,6 +2,7 @@ package com.example.googlelogin.controller;
 
 import com.example.googlelogin.model.AuthRequest;
 import com.example.googlelogin.service.AuthService;
+import com.example.googlelogin.service.SessionStore;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -16,14 +17,16 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final SessionStore sessionStore;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, SessionStore sessionStore) {
         this.authService = authService;
+        this.sessionStore = sessionStore;
     }
 
     @PostMapping("/check-email")
     public ResponseEntity<Map<String, Object>> checkEmail(@RequestBody AuthRequest req) {
-        if (req.email() == null || !req.email().contains("@")) {
+        if (req.email() == null || req.email().length() > 254 || !req.email().contains("@")) {
             return ResponseEntity.badRequest().body(Map.of("error", "請輸入有效的電子郵件地址"));
         }
         if (!authService.userExists(req.email())) {
@@ -37,11 +40,16 @@ public class AuthController {
         if (req.email() == null || req.password() == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "請輸入電子郵件與密碼"));
         }
-        if (!authService.checkPassword(req.email(), req.password())) {
-            return ResponseEntity.status(401).body(Map.of("error", "密碼錯誤，請再試一次"));
+        if (req.password().length() > 128) {
+            return ResponseEntity.badRequest().body(Map.of("error", "密碼格式不正確"));
         }
-        ResponseCookie cookie = ResponseCookie.from("auth_email", req.email())
+        if (!authService.checkPassword(req.email(), req.password())) {
+            return ResponseEntity.status(401).body(Map.of("error", "帳號或密碼錯誤"));
+        }
+        String sessionId = sessionStore.create(req.email());
+        ResponseCookie cookie = ResponseCookie.from("session_id", sessionId)
                 .httpOnly(true)
+                .secure(true)
                 .path("/")
                 .maxAge(60 * 60 * 24)
                 .sameSite("Lax")
@@ -52,9 +60,12 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout() {
-        ResponseCookie cookie = ResponseCookie.from("auth_email", "")
+    public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request) {
+        String sessionId = getSessionId(request);
+        sessionStore.remove(sessionId);
+        ResponseCookie cookie = ResponseCookie.from("session_id", "")
                 .httpOnly(true)
+                .secure(true)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
@@ -66,14 +77,20 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> me(HttpServletRequest request) {
-        String email = Arrays.stream(request.getCookies() != null ? request.getCookies() : new jakarta.servlet.http.Cookie[0])
-                .filter(c -> "auth_email".equals(c.getName()))
-                .map(jakarta.servlet.http.Cookie::getValue)
-                .findFirst()
-                .orElse(null);
-        if (email == null || email.isBlank() || !authService.userExists(email)) {
+        String sessionId = getSessionId(request);
+        String email = sessionStore.getEmail(sessionId);
+        if (email == null || !authService.userExists(email)) {
             return ResponseEntity.status(401).body(Map.of("error", "未登入"));
         }
         return ResponseEntity.ok(Map.of("email", email));
+    }
+
+    private String getSessionId(HttpServletRequest request) {
+        if (request.getCookies() == null) return null;
+        return Arrays.stream(request.getCookies())
+                .filter(c -> "session_id".equals(c.getName()))
+                .map(jakarta.servlet.http.Cookie::getValue)
+                .findFirst()
+                .orElse(null);
     }
 }
