@@ -27,15 +27,23 @@ spec:
             limits:
               cpu: "1000m"
               memory: "512Mi"
+          env:
+            - name: APP_CORS_ALLOWED_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: google-login-api-config
+                  key: cors-allowed-origin
+            - name: APP_COOKIE_SECURE
+              value: "true"
           readinessProbe:
             httpGet:
-              path: /api/auth/me
+              path: /api/health
               port: 8080
             initialDelaySeconds: 20
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /api/auth/me
+              path: /api/health
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 15

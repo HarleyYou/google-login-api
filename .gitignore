@@ -18,3 +18,4 @@ Thumbs.db
 # Spring Boot
 *.jar
 *.war
+.claude/settings.json

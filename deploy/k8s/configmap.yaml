@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: google-login-api-config
+  namespace: default
+data:
+  cors-allowed-origin: "https://your-frontend-domain.com"
